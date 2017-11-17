@@ -1,0 +1,26 @@
+void Start()
+{
+    onStart();
+}
+
+void FixedUpdate()
+{
+    onFixedUpdate();
+}
+
+void Update()
+{
+    onUpdate();
+}
+void onStart()
+{
+
+}
+void onFixedUpdate()
+{
+
+}
+void onUpdate()
+{
+
+}
