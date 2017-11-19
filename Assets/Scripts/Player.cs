@@ -7,16 +7,33 @@ public class Player : MonoBehaviour
     // Game Objects
     private Rigidbody myRigidbody;
     // Physics and Movement
-    float forward;
-    float lateral;
-    float pivot;
+    // W/S Inputs
+    float forwardInput;
+    // Q/E Inputs
+    float lateralInput;
+    // A/D Inputs
+    float pivotInput, pivotInput2;
 
-	public float baseMultiplier;
-	float forwardMultiplier;
-	public float lateralMultiplier;
-	public float pivotMultiplier;
+    // Acceleration
+    public float accelerationMultiplier;
+    float forwardMultiplier;
+    public float lateralMultiplier;
 
-	Vector3 pivotProduct;
+    // Torque (Angular) Acceleration
+    public float pivotMultiplier;
+
+    Vector3 pivotProduct;
+
+    float curMaxVelocity, trueMaxVelocity;
+    public Vector3 counterVelocityTotal, counterVelocitySingle;
+    float terrainVelocityModifier;
+    float squareMaxVelocity;
+    float maxAngularVelocity;
+    float excessiveVelocityThreshold;
+
+    bool isMaxVelocityExceeded;
+    bool hasInitialAdjustmentCompleted;
+    int velocityRegulatorCounter, velocityRegulatorCounterMax;
 
     void Start()
     {
@@ -36,20 +53,38 @@ public class Player : MonoBehaviour
     {
         // Game Objects
         myRigidbody = GetComponent<Rigidbody>();
+        myRigidbody.centerOfMass = new Vector3(myRigidbody.centerOfMass.x, myRigidbody.centerOfMass.y - .5f, myRigidbody.centerOfMass.z);
 
         // Movement Values
-        forward = 0.0f;
-        lateral = 0.0f;
-        pivot = 0.0f;
+        forwardInput = 0.0f;
+        lateralInput = 0.0f;
+        pivotInput = 0.0f;
+        pivotInput2 = 0.0f;
 
-		//baseMultiplier = 25.0f;
-		forwardMultiplier = baseMultiplier;
-		lateralMultiplier = baseMultiplier * 0.6f;
-		//pivotMultiplier = 20.0f;
+        // acceleration Multiplier is public and declared from editor
+        //accelerationMultiplier = 25.0f;
+        forwardMultiplier = accelerationMultiplier;
+        lateralMultiplier = accelerationMultiplier * 0.6f;
+        // pivot Multiplier is public and declared from editor
+        //pivotMultiplier = 20.0f;
 
-		pivotProduct = new Vector3();
+        pivotProduct = new Vector3();
 
-		myRigidbody.maxAngularVelocity = 2.0f;
+        trueMaxVelocity = 20.0f;
+        curMaxVelocity = trueMaxVelocity;
+        counterVelocityTotal = new Vector3();
+        counterVelocitySingle = new Vector3();
+        terrainVelocityModifier = 1.0f;
+        squareMaxVelocity = curMaxVelocity * curMaxVelocity;
+        maxAngularVelocity = 2.0f;
+        myRigidbody.maxAngularVelocity = maxAngularVelocity;
+
+        isMaxVelocityExceeded = false;
+        velocityRegulatorCounter = 0;
+        velocityRegulatorCounterMax = 90;
+
+        excessiveVelocityThreshold = 2.0f;
+        hasInitialAdjustmentCompleted = false;
 
     }
     void onFixedUpdate()
@@ -58,37 +93,140 @@ public class Player : MonoBehaviour
     }
     void onUpdate()
     {
-		lateralMultiplier = baseMultiplier * 0.6f;
+        lateralMultiplier = accelerationMultiplier * 0.6f;
 
-		if(Input.GetKeyDown(KeyCode.Escape)) {
-			Application.Quit();
-		}
+        curMaxVelocity = trueMaxVelocity * terrainVelocityModifier;
+
+        squareMaxVelocity = curMaxVelocity * curMaxVelocity;
+
+        if (Input.GetKeyDown(KeyCode.Escape))
+        {
+            Application.Quit();
+        }
+
+        if (Input.GetKeyDown(KeyCode.F1))
+        {
+            float offsetX = transform.rotation.eulerAngles.x * -1;
+            float offsetZ = transform.rotation.eulerAngles.z * -1;
+            transform.Rotate(new Vector3(offsetX, 0, offsetZ));
+        }
     }
 
     void OnGUI()
     {
-		Vector3 forwardDirection = new Vector3();
-		forwardDirection = Vector3.right * forward * forwardMultiplier;
-        GUI.Label(new Rect(10, 0, 100, 100), forward.ToString());
-		GUI.Label(new Rect(10, 10, 100, 100), lateral.ToString());
-		GUI.Label(new Rect(10, 20, 100, 100), pivot.ToString());
-		GUI.Label(new Rect(10, 40, 100, 100), pivotProduct.ToString());
-		GUI.Label(new Rect(10, 50, 100, 100), myRigidbody.velocity.ToString());
+        Vector3 forwardDirection = new Vector3();
+        forwardDirection = Vector3.right * forwardInput * forwardMultiplier;
+        // GUI.Label(new Rect(10, 0, 100, 100), forwardInput.ToString());
+        // GUI.Label(new Rect(10, 10, 100, 100), lateralInput.ToString());
+        // GUI.Label(new Rect(10, 30, 100, 100), squareMaxVelocity.ToString());
+        // GUI.Label(new Rect(10, 40, 100, 100), myRigidbody.velocity.sqrMagnitude.ToString());
+        // GUI.Label(new Rect(10, 60, 100, 100), counterVelocity.ToString());
+        GUI.Label(new Rect(10, 40, 100, 100), myRigidbody.velocity.magnitude.ToString() + ":" + curMaxVelocity);
+        GUI.Label(new Rect(10, 50, 100, 100), myRigidbody.velocity.ToString());
+        GUI.Label(new Rect(10, 60, 100, 100), myRigidbody.velocity.normalized.ToString());
     }
 
     void Move()
     {
-        forward = Input.GetAxis("Vertical");
-        lateral = Input.GetAxis("Q/E");
-        pivot = Input.GetAxis("Horizontal");
+        forwardInput = Input.GetAxis("Vertical");
+        lateralInput = Input.GetAxis("Q/E");
+        pivotInput = Input.GetAxis("Horizontal");
+        pivotInput2 = Input.GetAxis("Mouse X");
 
-		pivotProduct = Vector3.up * pivot * pivotMultiplier;
-		myRigidbody.AddRelativeTorque(pivotProduct, ForceMode.Force);
-		myRigidbody.AddRelativeForce(Vector3.forward * forward * forwardMultiplier, ForceMode.Force);
-		myRigidbody.AddRelativeForce(Vector3.right * lateral * lateralMultiplier, ForceMode.Force);
+        pivotProduct = Vector3.up * (pivotInput + pivotInput2) * pivotMultiplier;
 
-		float maxVelocity = 10.0f;
-		myRigidbody.velocity = Vector3.ClampMagnitude(myRigidbody.velocity, maxVelocity);
-		
+        if (BoxCaseGroundCheck())
+        {
+            myRigidbody.AddRelativeTorque(pivotProduct, ForceMode.Force);
+            myRigidbody.AddRelativeForce(Vector3.forward * forwardInput * forwardMultiplier, ForceMode.Force);
+            myRigidbody.AddRelativeForce(Vector3.right * lateralInput * lateralMultiplier, ForceMode.Force);
+            if (myRigidbody.velocity.sqrMagnitude > squareMaxVelocity)
+            {
+                RegulateVelocity();
+                // if (Mathf.Sqrt(myRigidbody.velocity.sqrMagnitude - squareMaxVelocity) > excessiveVelocityThreshold)
+                // {
+                //     if (!isMaxVelocityExceeded)
+                //     {
+                //         isMaxVelocityExceeded = true;
+                //         counterVelocityTotal = myRigidbody.velocity.normalized * (Mathf.Sqrt(myRigidbody.velocity.sqrMagnitude - squareMaxVelocity) - 2.0f);
+                //         counterVelocitySingle = counterVelocityTotal / velocityRegulatorCounterMax;
+
+                //         // myRigidbody.AddRelativeForce(Vector3.back * forwardInput * forwardMultiplier, ForceMode.Force);
+                //         myRigidbody.AddForce(counterVelocitySingle * -1, ForceMode.Impulse);
+                //         velocityRegulatorCounter++;
+                //     }
+                //     else if (isMaxVelocityExceeded)
+                //     {
+                //         if (velocityRegulatorCounter < velocityRegulatorCounterMax)
+                //         {
+                //             myRigidbody.AddForce(counterVelocitySingle * -1, ForceMode.Impulse);
+                //             velocityRegulatorCounter++;
+                //         }
+                //         else
+                //         {
+                //             isMaxVelocityExceeded = false;
+                //             velocityRegulatorCounter = 0;
+                //         }
+                //     }
+                // }
+                // else
+                // {
+                //     isMaxVelocityExceeded = false;
+                //     velocityRegulatorCounter = 0;
+                // }
+
+            }
+
+            // myRigidbody.velocity = Vector3.ClampMagnitude(myRigidbody.velocity, maxVelocity);
+        }
+
+    }
+
+    void RegulateVelocity()
+    {
+        float preferredAdjustment = Mathf.Sqrt(myRigidbody.velocity.sqrMagnitude - squareMaxVelocity);
+        float overageRatio = (float)System.Math.Round(preferredAdjustment / myRigidbody.velocity.magnitude, 2);
+        // if (!hasInitialAdjustmentCompleted)
+        // {
+        // if (preferredAdjustment > excessiveVelocityThreshold)
+        // {
+        //     preferredAdjustment = excessiveVelocityThreshold;
+        //     hasInitialAdjustmentCompleted = true;
+        // }
+        // Debug.Log(preferredAdjustment);
+        Vector3 tempVelocity = myRigidbody.velocity.normalized * overageRatio;
+        // Debug.Log(myRigidbody.velocity + " " + tempVelocity + " " + overageRatio);
+
+        myRigidbody.AddForce(tempVelocity * -1, ForceMode.Impulse);
+        // }
+    }
+
+    bool BoxCaseGroundCheck()
+    {
+        // return Physics.SphereCast(transform.position, 0.1f, transform.up * -1, out hit, 1.1f);
+        Vector3 boxHalfSize = new Vector3(0.45f, 0.45f, .95f);
+        int layerMask = 1 << 8;
+
+        layerMask = ~layerMask;
+        Vector3 boxStartPosition = new Vector3(myRigidbody.position.x, myRigidbody.position.y, myRigidbody.position.z);
+        bool boxResponse = Physics.BoxCast(boxStartPosition, boxHalfSize, transform.up * -1, myRigidbody.rotation, 0.15f, layerMask);
+        Debug.Log(boxResponse);
+        return boxResponse;
+    }
+
+    void OnCollisionEnter(Collision col)
+    {
+        float modifier = 1.0f;
+        if (col.gameObject.tag == "Hot")
+        {
+            modifier = 1.4f;
+        }
+        else if (col.gameObject.tag == "Cold")
+        {
+            modifier = 0.6f;
+        }
+
+        terrainVelocityModifier = modifier;
+
     }
 }
