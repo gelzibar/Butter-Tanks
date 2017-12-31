@@ -5,9 +5,9 @@ PhysicMaterial:
   m_ObjectHideFlags: 0
   m_PrefabParentObject: {fileID: 0}
   m_PrefabInternal: {fileID: 0}
-  m_Name: Basic Cold
-  dynamicFriction: 0.6
-  staticFriction: 0.6
-  bounciness: 0
-  frictionCombine: 0
-  bounceCombine: 0
+  m_Name: Basic Pickup
+  dynamicFriction: 0.2
+  staticFriction: 0.2
+  bounciness: 0.9
+  frictionCombine: 1
+  bounceCombine: 3
