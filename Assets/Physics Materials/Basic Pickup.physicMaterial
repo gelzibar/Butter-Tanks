@@ -8,6 +8,6 @@ PhysicMaterial:
   m_Name: Basic Pickup
   dynamicFriction: 0.2
   staticFriction: 0.2
-  bounciness: 0.9
+  bounciness: 0.75
   frictionCombine: 1
   bounceCombine: 3

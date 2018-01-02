@@ -4,7 +4,8 @@ using UnityEngine;
 
 public class TiltBoundary : MonoBehaviour
 {
-	public int currentCollides;
+    public int currentCollides;
+
     void Start()
     {
         onStart();
@@ -21,7 +22,7 @@ public class TiltBoundary : MonoBehaviour
     }
     void onStart()
     {
-		currentCollides = 0;
+        currentCollides = 0;
 
     }
     void onFixedUpdate()
@@ -30,18 +31,24 @@ public class TiltBoundary : MonoBehaviour
     }
     void onUpdate()
     {
-		if(currentCollides < 0) {
-			currentCollides = 0;
-		}
+        if (currentCollides < 0)
+        {
+            currentCollides = 0;
+        }
 
     }
-	void OnTriggerEnter(Collider collider) 
-	{
-		currentCollides++;
-
-	}
-	void OnTriggerExit(Collider collider) 
-	{
-		currentCollides--;
-	}
+    void OnTriggerEnter(Collider collider)
+    {
+        if (collider.tag != "Player" && collider.tag != "Item")
+        {
+            currentCollides++;
+        }
+    }
+    void OnTriggerExit(Collider collider)
+    {
+        if (collider.tag != "Player" && collider.tag != "Item")
+        {
+            currentCollides--;
+        }
+    }
 }

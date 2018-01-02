@@ -6,8 +6,9 @@ public class Pickup : MonoBehaviour
 {
 
 
-    Transform cross;
+    Transform cross, guide;
     Quaternion interiorRotation;
+    float guideOffsetY;
 	float rotateIncrement = 1.0f;
 
 	int healAmount = 10;
@@ -35,10 +36,12 @@ public class Pickup : MonoBehaviour
     void onStart()
     {
         cross = transform.Find("Cross").GetComponent<Transform>();
+        guide = transform.Find("Guide").GetComponent<Transform>();
 
 		// interiorRotation tracks rotation ignoring parent transform. 
 		// It's reapplied at the Late Update to supercede anything that occured during physics updates.
         interiorRotation = cross.rotation;
+        guideOffsetY = guide.transform.position.y - (transform.position.y + (transform.localScale.y / 2));
 
     }
     void onFixedUpdate()
@@ -58,6 +61,10 @@ public class Pickup : MonoBehaviour
 	void onLateUpdate(){
 		// Used here to supercede anything that occured during physics updates.
 		cross.rotation = interiorRotation;
+        guide.rotation = interiorRotation;
+        Vector3 tempVector = new Vector3(transform.position.x, transform.position.y + guideOffsetY, transform.position.z);
+        guide.transform.position = tempVector;
+
 	}
 
 	void OnCollisionEnter(Collision col) {

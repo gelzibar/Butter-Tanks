@@ -6,6 +6,7 @@ TagManager:
   tags:
   - Hot
   - Cold
+  - Item
   layers:
   - Default
   - TransparentFX

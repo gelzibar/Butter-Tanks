@@ -5,6 +5,10 @@ using UnityEngine;
 
 public class Player : MonoBehaviour
 {
+
+    /* NOTE
+        FixedTimestep in Time Settings and Default Contact offset in Physics were adjusted to smoothly move over tile edges.
+     */
     // Game Objects
     private Rigidbody myRigidbody;
     // Physics and Movement
@@ -16,6 +20,7 @@ public class Player : MonoBehaviour
     // Acceleration
     public float accelerationMultiplier;
     float forwardMultiplier;
+    Vector3 inAirMultiplier;
 
     // Torque (Angular) Acceleration
     public float pivotMultiplier;
@@ -42,6 +47,9 @@ public class Player : MonoBehaviour
     float initialDegreeX;
     float initialDegreeZ;
     float initialAngularDrag;
+    
+    // Jumping
+    bool isJumping;
 
     void Start()
     {
@@ -64,6 +72,7 @@ public class Player : MonoBehaviour
 
         // Lowering the center of Mass helps with the stability of the cube. Raising it makes it prone to flip.
         myRigidbody.centerOfMass = new Vector3(myRigidbody.centerOfMass.x, myRigidbody.centerOfMass.y - .15f, myRigidbody.centerOfMass.z);
+        myRigidbody.centerOfMass = new Vector3(myRigidbody.centerOfMass.x, myRigidbody.centerOfMass.y - .15f, myRigidbody.centerOfMass.z - .15f);
         //original COM
         // myRigidbody.centerOfMass = new Vector3(myRigidbody.centerOfMass.x, myRigidbody.centerOfMass.y - .5f, myRigidbody.centerOfMass.z);
 
@@ -74,6 +83,7 @@ public class Player : MonoBehaviour
         // acceleration Multiplier is public and declared from editor
         // pivot Multiplier is public and declared from editor
         forwardMultiplier = accelerationMultiplier;
+        inAirMultiplier = new Vector3(5f, 0f, forwardMultiplier * .1f);
 
         // Turning values
         // pivotProduct is the Total combination of all turning elements. Applied directly to rigidbody through torque
@@ -106,10 +116,25 @@ public class Player : MonoBehaviour
         initialDegreeZ = 0;
         initialAngularDrag = myRigidbody.angularDrag;
 
+        
+        isJumping = false;
+
     }
     void onFixedUpdate()
     {
-        Move();
+        if (BoxCaseGroundCheck())
+        {
+            Move();
+        }
+        else if (!BoxCaseGroundCheck() && tiltBoundary.currentCollides == 0)
+        {
+            if (!isTiltRecovering)
+            {
+                InAirStability();
+            }
+            Move2();
+        }
+
         if (isTiltRecovering)
         {
             TiltRecovery();
@@ -146,6 +171,11 @@ public class Player : MonoBehaviour
             float offsetZ = transform.rotation.eulerAngles.z * -1;
             transform.Rotate(new Vector3(90f, 0f, 0f));
         }
+
+        if(Input.GetKeyDown(KeyCode.Space)) 
+        {
+            isJumping = true;
+        }
     }
 
     void TiltRecovery()
@@ -156,7 +186,7 @@ public class Player : MonoBehaviour
 
             myRigidbody.maxAngularVelocity = 2.0f;
             TiltRecoverySequence++;
-            sequence2Counter = 90;
+            sequence2Counter = 180;
             initialDegreeX = myRigidbody.rotation.eulerAngles.x;
             initialDegreeZ = myRigidbody.rotation.eulerAngles.z;
         }
@@ -205,12 +235,99 @@ public class Player : MonoBehaviour
                 myRigidbody.angularDrag = 10.0f;
             }
 
-            if (sequence2Counter <= 0)
+            if (sequence2Counter <= 0 || BoxCaseGroundCheck())
             {
                 myRigidbody.angularDrag = initialAngularDrag;
                 myRigidbody.maxAngularVelocity = initialMaxAngularVelocity;
                 TiltRecoverySequence = 0;
                 isTiltRecovering = false;
+
+            }
+
+            sequence2Counter--;
+        }
+    }
+
+    void InAirStability()
+    {
+
+        if (TiltRecoverySequence == 0)
+        {
+            // myRigidbody.AddForce(Vector3.up * 8f, ForceMode.Impulse);
+
+            myRigidbody.maxAngularVelocity = 2.0f;
+            TiltRecoverySequence++;
+            sequence2Counter = 180;
+            initialDegreeX = myRigidbody.rotation.eulerAngles.x;
+            initialDegreeZ = myRigidbody.rotation.eulerAngles.z;
+        }
+        else if (TiltRecoverySequence == 1)
+        {
+            Vector3 curAngle = new Vector3(myRigidbody.rotation.eulerAngles.x, myRigidbody.rotation.eulerAngles.y, myRigidbody.rotation.eulerAngles.z);
+            Vector3 localAngularVelocity = transform.InverseTransformVector(myRigidbody.angularVelocity);
+            float degreeCeiling = 355f;
+            float degreeFloor = 5f;
+
+            float force = .01f;
+
+            // X section
+            int signedX = 1;
+            if (curAngle.x < 180)
+            {
+                signedX *= -1;
+            }
+
+            float deltaTargetAngularVelocity = 0f;
+            float frictionValue = GetComponent<BoxCollider>().material.dynamicFriction;
+            float targetValue = .15f;
+            float targetedAngularVelocityX = targetValue * signedX;
+            deltaTargetAngularVelocity = targetedAngularVelocityX - localAngularVelocity.x;
+            // deltaTargetAngularVelocity += frictionValue * Math.Sign(steeringInput);
+
+            Vector3 adjustment = Vector3.right * deltaTargetAngularVelocity;
+
+            // float torqueValue = ExponentialDecay(initialDegreeX, force, (90 - sequence2Counter));
+            float torqueValue = force;
+            // Debug.Log("Exp: " + torqueValue.ToString("00.00") + " Counter: " + sequence2Counter + " Vel: " + localAngularVelocity.x + " X: " + curAngle.x);
+
+            if (curAngle.x >= degreeFloor && curAngle.x <= degreeCeiling)
+            {
+                myRigidbody.AddRelativeTorque(adjustment.x, 0f, 0f, ForceMode.VelocityChange);
+            }
+
+            // Z section
+            int signedZ = 1;
+            if (curAngle.z < 180)
+            {
+                signedZ *= -1;
+            }
+
+            float targetedAngularVelocityZ = targetValue * signedZ;
+            deltaTargetAngularVelocity = targetedAngularVelocityZ - localAngularVelocity.z;
+
+            // torqueValue = ExponentialDecay(initialDegreeZ, force, (90 - sequence2Counter));
+            torqueValue = force;
+
+            adjustment = Vector3.forward * deltaTargetAngularVelocity;
+
+            if (curAngle.z >= degreeFloor && curAngle.z <= degreeCeiling)
+            {
+                myRigidbody.AddRelativeTorque(0f, 0f, adjustment.z, ForceMode.VelocityChange);
+            }
+
+
+            // If the unit has righted on both X and Z axes, Increase the drag to kill excess angularVelocity
+            if ((curAngle.z <= degreeFloor || curAngle.z >= degreeCeiling) && (curAngle.x <= degreeFloor || curAngle.x >= degreeCeiling))
+            {
+                // myRigidbody.angularDrag = 10.0f;
+            }
+
+            if (sequence2Counter <= 0 || BoxCaseGroundCheck())
+            {
+                myRigidbody.angularDrag = initialAngularDrag;
+                myRigidbody.maxAngularVelocity = initialMaxAngularVelocity;
+                TiltRecoverySequence = 0;
+                //isTiltRecovering = false;
 
             }
 
@@ -247,7 +364,7 @@ public class Player : MonoBehaviour
     {
 
         // Ang Vel of .4-.5 feels good for turning
-        // with Vel Change forcemode, this can be achieved by .305
+        // with Vel Change forcemode
 
         // Forcemode.VelocityChange directly adjusts the angular velocity. Give or take some
         // However, physic material Friction also seems to impact this. Add an additional offset for this
@@ -262,9 +379,17 @@ public class Player : MonoBehaviour
         float deltaTargetAngularVelocity = 0f;
         float localVelocityZ = transform.InverseTransformVector(myRigidbody.velocity).z;
         float baseTarget = .75f;
-        // Checking it against zero didn't seem to function. checking it against a small value (.025 arbitrarily)
+        Vector3 rotation = myRigidbody.rotation.eulerAngles;
+        float climbFactor = 1f;
+        
+        Debug.Log(rotation.x.ToString("00.00"));
+        if(rotation.x > 180f && rotation.x < 345f) 
+        {
+            climbFactor = 0.9f;
+        } 
+        // Checking it against zero didn't seem to function. checking it against a small value (.25 after viewing vel during attempted rotations)
         // seems to achieve the behavior
-        if (Math.Abs(localVelocityZ) >= 0.025f)
+        if (Math.Abs(localVelocityZ) >= 0.25f)
         {
             deltaTargetAngularVelocity = Steering2(baseTarget);
         }
@@ -275,19 +400,66 @@ public class Player : MonoBehaviour
 
         pivotProduct = Vector3.up * deltaTargetAngularVelocity;
 
+        if(isJumping) 
+        {
+            myRigidbody.AddForce(Vector3.up * 4.5f, ForceMode.VelocityChange);
+            isJumping = false;
+        }
+
         if (BoxCaseGroundCheck())
         {
             myRigidbody.AddRelativeTorque(pivotProduct, ForceMode.VelocityChange);
-            myRigidbody.AddRelativeForce(Vector3.forward * forwardInput * forwardMultiplier, ForceMode.Force);
+            myRigidbody.AddRelativeForce(Vector3.forward * forwardInput * forwardMultiplier * climbFactor, ForceMode.Force);
 
             RegulateVelocity();
             RegulateLateralVelocity();
         }
     }
 
+    void Move2()
+    {
+
+        // Ang Vel of .4-.5 feels good for turning
+        // with Vel Change forcemode
+
+        // Forcemode.VelocityChange directly adjusts the angular velocity. Give or take some
+        // However, physic material Friction also seems to impact this. Add an additional offset for this
+
+        // Left and right turning is not precisely the same, but it's withing spitting distance. 
+        // seems to be something related to friction physics-- setting to zero will ignore it
+        // Will be investigating "friction 2" functionality I discovered
+
+        forwardInput = Input.GetAxis("Vertical");
+        steeringInput = Input.GetAxis("Horizontal");
+
+        float deltaTargetAngularVelocity = 0f;
+        float localVelocityZ = transform.InverseTransformVector(myRigidbody.velocity).z;
+        float baseTarget = .75f;
+        // Checking it against zero didn't seem to function. checking it against a small value (.25 after viewing vel during attempted rotations)
+        // seems to achieve the behavior
+        if (Math.Abs(localVelocityZ) >= 0.25f)
+        {
+            deltaTargetAngularVelocity = Steering2(baseTarget);
+        }
+        else
+        {
+            deltaTargetAngularVelocity = Steering2(baseTarget * 2.25f);
+        }
+
+        pivotProduct = Vector3.up * deltaTargetAngularVelocity;
+
+        //if (BoxCaseGroundCheck())
+        //{
+            myRigidbody.AddRelativeForce(Vector3.right * steeringInput * inAirMultiplier.x, ForceMode.Force);
+            myRigidbody.AddRelativeForce(Vector3.forward * forwardInput * inAirMultiplier.z, ForceMode.Force);
+
+            //RegulateVelocity();
+            //RegulateLateralVelocity();
+        //}
+    }
+
     float Steering(float targetValue)
     {
-        Debug.Log(targetValue);
         float deltaTargetAngularVelocity = 0f;
         if (steeringInput != 0f)
         {
@@ -309,7 +481,6 @@ public class Player : MonoBehaviour
          * Until I can isolate it further, I've customized the steering function to degrade negative/
          * left turn by 15%-- this seems to get the values in range at the setting angVel goal of .75 
          */
-        Debug.Log(targetValue);
         float deltaTargetAngularVelocity = 0f;
         if (steeringInput != 0f)
         {
@@ -317,10 +488,11 @@ public class Player : MonoBehaviour
             float localAngularVelocityY = transform.InverseTransformVector(myRigidbody.angularVelocity).y;
             float targetedAngularVelocity = targetValue * Math.Sign(steeringInput);
             deltaTargetAngularVelocity = targetedAngularVelocity - localAngularVelocityY;
-            if(steeringInput > 0)
+            if (steeringInput > 0)
             {
                 deltaTargetAngularVelocity += frictionValue * Math.Sign(steeringInput);
-            }else if (steeringInput < 0 ) 
+            }
+            else if (steeringInput < 0)
             {
                 deltaTargetAngularVelocity += frictionValue * Math.Sign(steeringInput) * .85f;
             }
@@ -344,9 +516,11 @@ public class Player : MonoBehaviour
     void RegulateLateralVelocity()
     {
         Vector3 localVelocity = transform.InverseTransformVector(myRigidbody.velocity);
-        if (Math.Abs(localVelocity.x) > trueMaxVelocity * .15f)
+        // A value that has been working well is .15f
+        float maxLateralVelMultiplier = .15f;
+        if (Math.Abs(localVelocity.x) > trueMaxVelocity * maxLateralVelMultiplier)
         {
-            float maxLateralVelocity = trueMaxVelocity * .15f;
+            float maxLateralVelocity = trueMaxVelocity * maxLateralVelMultiplier;
             float squareMaxLateralVelocity = maxLateralVelocity * maxLateralVelocity;
             float preferredAdjustment = localVelocity.x * localVelocity.x - squareMaxLateralVelocity;
             float overageRatio = (float)System.Math.Round(preferredAdjustment / localVelocity.x, 4);

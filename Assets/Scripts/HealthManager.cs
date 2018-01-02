@@ -64,11 +64,20 @@ public class HealthManager : MonoBehaviour
         {
             if (curCountdown <= 0f)
             {
+                // Determine random direction
+                Vector3 forceDirection = new Vector3(Random.Range(-5f, 5f), Random.Range(-5f, 5f), Random.Range(-5f, 5f));
+                forceDirection = forceDirection.normalized;
+                // Determine random magnitude
+                float magnitude = Random.Range(0f, 2f);
+                Vector3 force = forceDirection * magnitude;
+                
+
                 // Spawn a new health object
                 int index = Random.Range(0, nodes.Count);
                 nodes[index].GetComponent<ParticleSystem>().Stop();
                 nodes[index].GetComponent<ParticleSystem>().Play();
                 curPickup = Instantiate(pickupTemplate, nodes[index].position, nodes[index].rotation);
+                curPickup.GetComponent<Rigidbody>().AddRelativeForce(force, ForceMode.Impulse);
                 isCountingDown = false;
             }
             else
