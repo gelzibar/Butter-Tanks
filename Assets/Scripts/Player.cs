@@ -5,7 +5,21 @@ using UnityEngine;
 
 public class Player : MonoBehaviour
 {
+    [System.Serializable]
+    public struct InitialConfiguration
+    {
+        public Transform player;
+        public Vector3 position;
+        public Quaternion rotation;
 
+        public void Initialize()
+        {
+            player = GameObject.FindObjectOfType<Player>().transform;
+            position = player.position;
+            rotation = player.rotation;
+        }
+
+    }
     /* NOTE
         FixedTimestep in Time Settings and Default Contact offset in Physics were adjusted to smoothly move over tile edges.
      */
@@ -47,9 +61,36 @@ public class Player : MonoBehaviour
     float initialDegreeX;
     float initialDegreeZ;
     float initialAngularDrag;
-    
+
     // Jumping
     bool isJumping;
+
+    // Braking
+    bool isBraking;
+
+    // Initial Values
+    public InitialConfiguration initial;
+
+    // Sound
+    AudioSource audio;
+    public AudioClip sliding;
+    public AudioClip jumping;
+    public AudioClip wobble;
+    bool jumpTrigger = false;
+
+    [System.Serializable]
+    public struct velocityTracker
+    {
+        public Vector3 curVelocity;
+
+        public void Update(Vector3 rbVelocity)
+        {
+            curVelocity = rbVelocity;
+        }
+    }
+
+    public velocityTracker myVelocity;
+
 
     void Start()
     {
@@ -69,6 +110,8 @@ public class Player : MonoBehaviour
     {
         // Game Objects
         myRigidbody = GetComponent<Rigidbody>();
+
+        initial.Initialize();
 
         // Lowering the center of Mass helps with the stability of the cube. Raising it makes it prone to flip.
         myRigidbody.centerOfMass = new Vector3(myRigidbody.centerOfMass.x, myRigidbody.centerOfMass.y - .15f, myRigidbody.centerOfMass.z);
@@ -116,8 +159,11 @@ public class Player : MonoBehaviour
         initialDegreeZ = 0;
         initialAngularDrag = myRigidbody.angularDrag;
 
-        
+
         isJumping = false;
+        isBraking = false;
+
+        audio = GetComponent<AudioSource>();
 
     }
     void onFixedUpdate()
@@ -128,6 +174,7 @@ public class Player : MonoBehaviour
         }
         else if (!BoxCaseGroundCheck() && tiltBoundary.currentCollides == 0)
         {
+
             if (!isTiltRecovering)
             {
                 InAirStability();
@@ -172,9 +219,68 @@ public class Player : MonoBehaviour
             transform.Rotate(new Vector3(90f, 0f, 0f));
         }
 
-        if(Input.GetKeyDown(KeyCode.Space)) 
+        if (Input.GetKeyDown(KeyCode.F8))
+        {
+            transform.position = initial.position;
+            transform.rotation = initial.rotation;
+        }
+
+        if (Input.GetKeyDown(KeyCode.Space))
         {
             isJumping = true;
+        }
+
+        if (Input.GetKey(KeyCode.LeftShift))
+        {
+            isBraking = true;
+        }
+        else
+        {
+            isBraking = false;
+        }
+
+        myVelocity.Update(myRigidbody.velocity);
+
+        BasicSound();
+    }
+
+    void BasicSound()
+    {
+        if (Mathf.Abs(myRigidbody.velocity.z) > 0.01f && BoxCaseGroundCheck())
+        {
+            audio.clip = sliding;
+            if (!audio.isPlaying)
+            {
+                audio.loop = true;
+                audio.Play();
+            }
+        }
+        else if (!BoxCaseGroundCheck() && tiltBoundary.currentCollides == 0)
+        {
+            audio.clip = wobble;
+            if (!audio.isPlaying)
+            { 
+                audio.loop = true;
+                audio.Play();
+            }
+
+        }
+        else
+        {
+            audio.Stop();
+        }
+
+        if (isJumping)
+        {
+            if (!jumpTrigger)
+            {
+                AudioSource.PlayClipAtPoint(jumping, transform.position);
+                jumpTrigger = true;
+            }
+        }
+        else
+        {
+            jumpTrigger = false;
         }
     }
 
@@ -347,18 +453,18 @@ public class Player : MonoBehaviour
 
     }
 
-    void OnGUI()
-    {
-        Vector3 forwardDirection = new Vector3();
-        forwardDirection = Vector3.right * forwardInput * forwardMultiplier;
-        GUIStyle style = new GUIStyle();
-        style.fontSize = 16;
-        style.normal.textColor = Color.red;
-        GUI.Label(new Rect(10, 10, 200, 100), "Input: " + steeringInput, style);
-        GUI.Label(new Rect(10, 23, 200, 100), "Velocity: " + transform.InverseTransformVector(myRigidbody.velocity), style);
-        GUI.Label(new Rect(10, 36, 200, 100), "Angular Velocity: " + transform.InverseTransformVector(myRigidbody.angularVelocity).ToString("00.00"), style);
-        GUI.Label(new Rect(10, 49, 200, 100), "Angular Drag: " + myRigidbody.angularDrag, style);
-    }
+    // void OnGUI()
+    // {
+    //     Vector3 forwardDirection = new Vector3();
+    //     forwardDirection = Vector3.right * forwardInput * forwardMultiplier;
+    //     GUIStyle style = new GUIStyle();
+    //     style.fontSize = 16;
+    //     style.normal.textColor = Color.red;
+    //     GUI.Label(new Rect(10, 10, 200, 100), "Input: " + steeringInput, style);
+    //     GUI.Label(new Rect(10, 23, 200, 100), "Velocity: " + transform.InverseTransformVector(myRigidbody.velocity), style);
+    //     GUI.Label(new Rect(10, 36, 200, 100), "Angular Velocity: " + transform.InverseTransformVector(myRigidbody.angularVelocity).ToString("00.00"), style);
+    //     GUI.Label(new Rect(10, 49, 200, 100), "Angular Drag: " + myRigidbody.angularDrag, style);
+    // }
 
     void Move()
     {
@@ -381,12 +487,11 @@ public class Player : MonoBehaviour
         float baseTarget = .75f;
         Vector3 rotation = myRigidbody.rotation.eulerAngles;
         float climbFactor = 1f;
-        
-        Debug.Log(rotation.x.ToString("00.00"));
-        if(rotation.x > 180f && rotation.x < 345f) 
+
+        if (rotation.x > 180f && rotation.x < 345f)
         {
             climbFactor = 0.9f;
-        } 
+        }
         // Checking it against zero didn't seem to function. checking it against a small value (.25 after viewing vel during attempted rotations)
         // seems to achieve the behavior
         if (Math.Abs(localVelocityZ) >= 0.25f)
@@ -400,7 +505,7 @@ public class Player : MonoBehaviour
 
         pivotProduct = Vector3.up * deltaTargetAngularVelocity;
 
-        if(isJumping) 
+        if (isJumping)
         {
             myRigidbody.AddForce(Vector3.up * 4.5f, ForceMode.VelocityChange);
             isJumping = false;
@@ -410,6 +515,22 @@ public class Player : MonoBehaviour
         {
             myRigidbody.AddRelativeTorque(pivotProduct, ForceMode.VelocityChange);
             myRigidbody.AddRelativeForce(Vector3.forward * forwardInput * forwardMultiplier * climbFactor, ForceMode.Force);
+            if (isBraking)
+            {
+                Debug.Log("Is Braking");
+                if (Mathf.Abs(localVelocityZ) > 10f)
+                {
+                    myRigidbody.AddRelativeForce(0, 0, localVelocityZ * -.0125f, ForceMode.VelocityChange);
+                }
+                else if (Mathf.Abs(localVelocityZ) > 2.5f)
+                {
+                    myRigidbody.AddRelativeForce(0, 0, localVelocityZ * -.05f, ForceMode.VelocityChange);
+                }
+                else if (Mathf.Abs(localVelocityZ) <= 2.5f)
+                {
+                    myRigidbody.AddRelativeForce(0, 0, localVelocityZ * -.85f, ForceMode.VelocityChange);
+                }
+            }
 
             RegulateVelocity();
             RegulateLateralVelocity();
@@ -450,11 +571,11 @@ public class Player : MonoBehaviour
 
         //if (BoxCaseGroundCheck())
         //{
-            myRigidbody.AddRelativeForce(Vector3.right * steeringInput * inAirMultiplier.x, ForceMode.Force);
-            myRigidbody.AddRelativeForce(Vector3.forward * forwardInput * inAirMultiplier.z, ForceMode.Force);
+        myRigidbody.AddRelativeForce(Vector3.right * steeringInput * inAirMultiplier.x, ForceMode.Force);
+        myRigidbody.AddRelativeForce(Vector3.forward * forwardInput * inAirMultiplier.z, ForceMode.Force);
 
-            //RegulateVelocity();
-            //RegulateLateralVelocity();
+        //RegulateVelocity();
+        //RegulateLateralVelocity();
         //}
     }
 

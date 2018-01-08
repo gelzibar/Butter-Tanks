@@ -21,7 +21,7 @@ GameObject:
   - component: {fileID: 4309293016301366}
   - component: {fileID: 33176972778622788}
   - component: {fileID: 23788314442082644}
-  m_Layer: 0
+  m_Layer: 9
   m_Name: Cross
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -42,7 +42,7 @@ GameObject:
   - component: {fileID: 54211492916430902}
   - component: {fileID: 114739555774540664}
   - component: {fileID: 96137062974443420}
-  m_Layer: 0
+  m_Layer: 9
   m_Name: Pickup Small Health
   m_TagString: Item
   m_Icon: {fileID: 0}
@@ -60,7 +60,7 @@ GameObject:
   - component: {fileID: 33810076693501928}
   - component: {fileID: 136904350695900416}
   - component: {fileID: 23444013464486816}
-  m_Layer: 0
+  m_Layer: 9
   m_Name: Guide
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -261,7 +261,7 @@ TrailRenderer:
   m_LightProbeUsage: 0
   m_ReflectionProbeUsage: 0
   m_Materials:
-  - {fileID: 2100000, guid: dc96796b4b0164b099a8177f8681e808, type: 2}
+  - {fileID: 2100000, guid: 8c97146bfbadd45c2beabd1d3099d6b0, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0

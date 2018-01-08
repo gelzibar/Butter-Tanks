@@ -5,6 +5,8 @@ using UnityEngine;
 public class TiltBoundary : MonoBehaviour
 {
     public int currentCollides;
+    Vector3 curPos;
+    public AudioClip impact;
 
     void Start()
     {
@@ -23,6 +25,7 @@ public class TiltBoundary : MonoBehaviour
     void onStart()
     {
         currentCollides = 0;
+        curPos = transform.parent.position;
 
     }
     void onFixedUpdate()
@@ -42,6 +45,10 @@ public class TiltBoundary : MonoBehaviour
         if (collider.tag != "Player" && collider.tag != "Item")
         {
             currentCollides++;
+            if(collider.ClosestPoint(transform.position).y < transform.position.y)
+            {
+                AudioSource.PlayClipAtPoint(impact, transform.position, 1.5f);
+            }
         }
     }
     void OnTriggerExit(Collider collider)
