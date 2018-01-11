@@ -34,7 +34,6 @@ public class CountdownDisplay : MonoBehaviour
         {
             myHealthManagers.Add(instance);
         }
-        Debug.Log(myHealthManagers.ToString());
 
         myPlayer = GameObject.FindObjectOfType<Player>().gameObject;
 

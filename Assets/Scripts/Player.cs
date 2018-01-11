@@ -40,18 +40,12 @@ public class Player : MonoBehaviour
     public float pivotMultiplier;
 
     public Vector3 pivotProduct;
-    float pivotCurrent;
 
     float curMaxVelocity, trueMaxVelocity;
     public Vector3 counterVelocityTotal, counterVelocitySingle;
     float terrainVelocityModifier;
     float squareMaxVelocity;
     float initialMaxAngularVelocity;
-    float excessiveVelocityThreshold;
-
-    bool isMaxVelocityExceeded;
-    bool hasInitialAdjustmentCompleted;
-    int velocityRegulatorCounter, velocityRegulatorCounterMax;
 
     // Tilt Recovery
     TiltBoundary tiltBoundary;
@@ -72,7 +66,7 @@ public class Player : MonoBehaviour
     public InitialConfiguration initial;
 
     // Sound
-    AudioSource audio;
+    new AudioSource audio;
     public AudioClip sliding;
     public AudioClip jumping;
     public AudioClip wobble;
@@ -108,6 +102,9 @@ public class Player : MonoBehaviour
     }
     void onStart()
     {
+        // Make sure game continues running when not in focus (this belongs somewhere else)
+        Application.runInBackground = true;
+        
         // Game Objects
         myRigidbody = GetComponent<Rigidbody>();
 
@@ -131,8 +128,6 @@ public class Player : MonoBehaviour
         // Turning values
         // pivotProduct is the Total combination of all turning elements. Applied directly to rigidbody through torque
         pivotProduct = new Vector3();
-        pivotCurrent = 0f;
-
 
         trueMaxVelocity = 35.0f;
         curMaxVelocity = trueMaxVelocity;
@@ -143,13 +138,6 @@ public class Player : MonoBehaviour
         // Had been set to 3.0f
         initialMaxAngularVelocity = 10.0f;
         myRigidbody.maxAngularVelocity = initialMaxAngularVelocity;
-
-        isMaxVelocityExceeded = false;
-        velocityRegulatorCounter = 0;
-        velocityRegulatorCounterMax = 90;
-
-        excessiveVelocityThreshold = 2.0f;
-        hasInitialAdjustmentCompleted = false;
 
         // Tilt Recovery
         tiltBoundary = transform.Find("Tilt Boundary").GetComponent<TiltBoundary>();
@@ -205,18 +193,14 @@ public class Player : MonoBehaviour
             }
 
         }
-
+        float rightAngle = 90f;
         if (Input.GetKeyDown(KeyCode.F2))
         {
-            float offsetX = transform.rotation.eulerAngles.x * -1;
-            float offsetZ = transform.rotation.eulerAngles.z * -1;
-            transform.Rotate(new Vector3(0, 0, 90f));
+            transform.Rotate(new Vector3(0, 0, rightAngle));
         }
         if (Input.GetKeyDown(KeyCode.F3))
         {
-            float offsetX = transform.rotation.eulerAngles.x * -1;
-            float offsetZ = transform.rotation.eulerAngles.z * -1;
-            transform.Rotate(new Vector3(90f, 0f, 0f));
+            transform.Rotate(new Vector3(rightAngle, 0f, 0f));
         }
 
         if (Input.GetKeyDown(KeyCode.F8))
@@ -299,7 +283,6 @@ public class Player : MonoBehaviour
         else if (TiltRecoverySequence == 1)
         {
             Vector3 curAngle = new Vector3(myRigidbody.rotation.eulerAngles.x, myRigidbody.rotation.eulerAngles.y, myRigidbody.rotation.eulerAngles.z);
-            Vector3 localAngularVelocity = transform.InverseTransformVector(myRigidbody.angularVelocity);
             float degreeCeiling = 352f;
             float degreeFloor = 8f;
 
@@ -313,7 +296,6 @@ public class Player : MonoBehaviour
             }
 
             float torqueValue = ExponentialDecay(initialDegreeX, force, (90 - sequence2Counter));
-            // Debug.Log("Exp: " + torqueValue.ToString("00.00") + " Counter: " + sequence2Counter + " Vel: " + localAngularVelocity.x + " X: " + curAngle.x);
 
             if (curAngle.x >= degreeFloor && curAngle.x <= degreeCeiling)
             {
@@ -374,8 +356,6 @@ public class Player : MonoBehaviour
             float degreeCeiling = 355f;
             float degreeFloor = 5f;
 
-            float force = .01f;
-
             // X section
             int signedX = 1;
             if (curAngle.x < 180)
@@ -392,10 +372,6 @@ public class Player : MonoBehaviour
 
             Vector3 adjustment = Vector3.right * deltaTargetAngularVelocity;
 
-            // float torqueValue = ExponentialDecay(initialDegreeX, force, (90 - sequence2Counter));
-            float torqueValue = force;
-            // Debug.Log("Exp: " + torqueValue.ToString("00.00") + " Counter: " + sequence2Counter + " Vel: " + localAngularVelocity.x + " X: " + curAngle.x);
-
             if (curAngle.x >= degreeFloor && curAngle.x <= degreeCeiling)
             {
                 myRigidbody.AddRelativeTorque(adjustment.x, 0f, 0f, ForceMode.VelocityChange);
@@ -410,9 +386,6 @@ public class Player : MonoBehaviour
 
             float targetedAngularVelocityZ = targetValue * signedZ;
             deltaTargetAngularVelocity = targetedAngularVelocityZ - localAngularVelocity.z;
-
-            // torqueValue = ExponentialDecay(initialDegreeZ, force, (90 - sequence2Counter));
-            torqueValue = force;
 
             adjustment = Vector3.forward * deltaTargetAngularVelocity;
 
@@ -645,7 +618,6 @@ public class Player : MonoBehaviour
             float squareMaxLateralVelocity = maxLateralVelocity * maxLateralVelocity;
             float preferredAdjustment = localVelocity.x * localVelocity.x - squareMaxLateralVelocity;
             float overageRatio = (float)System.Math.Round(preferredAdjustment / localVelocity.x, 4);
-            Vector3 tempVelocity = myRigidbody.velocity.normalized * overageRatio;
 
             myRigidbody.AddRelativeForce(overageRatio * -1, 0f, 0f, ForceMode.VelocityChange);
         }

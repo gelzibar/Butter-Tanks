@@ -56,7 +56,6 @@ public class FollowCamera : MonoBehaviour
     // target ~= playerTransform
     public Transform target;
     Transform playerTransform;
-    Vector3 cameraOffset;
     public float xOffset;
 
     public CollisionHandler collision = new CollisionHandler();
@@ -69,7 +68,6 @@ public class FollowCamera : MonoBehaviour
     public Vector3 targetPosition = Vector3.zero;
     Vector3 destination = Vector3.zero;
     Vector3 adjustedDestination = Vector3.zero;
-    Vector3 cameraVelocity = Vector3.zero;
 
     void Start()
     {
@@ -93,7 +91,6 @@ public class FollowCamera : MonoBehaviour
     void onStart()
     {
         playerTransform = GameObject.FindObjectOfType<Player>().transform;
-        cameraOffset = new Vector3(0, 1.4f, -4.25f);
         xOffset = -18.233f;
 
         PositionSettings position = new PositionSettings();

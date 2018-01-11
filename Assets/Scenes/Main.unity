@@ -4870,6 +4870,10 @@ Prefab:
       propertyPath: m_RootOrder
       value: 11
       objectReference: {fileID: 0}
+    - target: {fileID: 1166805949033914, guid: 1d01c39757e5a48d3ab1d321ba743625, type: 2}
+      propertyPath: m_Name
+      value: Trigger Collider
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
   m_ParentPrefab: {fileID: 100100000, guid: 1d01c39757e5a48d3ab1d321ba743625, type: 2}
   m_IsPrefabParent: 0
@@ -6917,7 +6921,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   currentCollides: 0
-  impact: {fileID: 8300000, guid: baa03e9a002d745e680e25b4b0494ab3, type: 3}
 --- !u!65 &1295277647
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -8141,7 +8144,7 @@ Camera:
     width: 1
     height: 1
   near clip plane: 0.3
-  far clip plane: 1500
+  far clip plane: 2000
   field of view: 60
   orthographic: 0
   orthographic size: 5
