@@ -35,6 +35,15 @@ public class TiltBoundary : MonoBehaviour
             currentCollides = 0;
         }
     }
+
+    public bool NoCollisions()
+    {
+        bool check = false;
+        if(currentCollides == 0)
+            check = true;
+        
+        return check;
+    }
     void OnTriggerEnter(Collider collider)
     {
         if (collider.tag != "Player" && collider.tag != "Item")

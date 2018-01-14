@@ -111,7 +111,8 @@ public class FollowCamera : MonoBehaviour
 
     void MoveToTarget()
     {
-        targetPosition = playerTransform.position + position.subjectOffset;
+        // targetPosition = playerTransform.position + position.subjectOffset;
+        targetPosition = playerTransform.TransformPoint(position.subjectOffset);
         // destination = Quaternion.Euler(0, playerTransform.eulerAngles.y, 0) * Vector3.forward * position.distanceFromSubject;
         destination = Quaternion.Euler(0, 0, 0) * Vector3.forward * position.distanceFromSubject;
         // destination += targetPosition;
@@ -151,7 +152,7 @@ public class FollowCamera : MonoBehaviour
             // }
 
         }
-        transform.LookAt(playerTransform);
+        transform.LookAt(playerTransform, playerTransform.up);
         transform.Rotate(xOffset, 0, 0);
 
     }
@@ -166,20 +167,20 @@ public class FollowCamera : MonoBehaviour
 
         adjustmentDistance = collision.GetAdjustedDistanceWithRayFrom(targetPosition);
 
-        MoveToTarget();
+        // MoveToTarget();
 
         // draw debug lines
-        for (int i = 0; i < 5; i++)
-        {
-            if (debug.drawDesiredCollisionLines)
-            {
-                Debug.DrawLine(targetPosition, collision.desiredClipPoints[i], Color.white);
-            }
-            if (debug.drawAdjustedCollisionLines)
-            {
-                Debug.DrawLine(targetPosition, collision.adjustedClipPoints[i], Color.green);
-            }
-        }
+        // for (int i = 0; i < 5; i++)
+        // {
+        //     if (debug.drawDesiredCollisionLines)
+        //     {
+        //         Debug.DrawLine(targetPosition, collision.desiredClipPoints[i], Color.white);
+        //     }
+        //     if (debug.drawAdjustedCollisionLines)
+        //     {
+        //         Debug.DrawLine(targetPosition, collision.adjustedClipPoints[i], Color.green);
+        //     }
+        // }
 
     }
     void onUpdate()
@@ -189,6 +190,7 @@ public class FollowCamera : MonoBehaviour
 
     void onLateUpdate()
     {
+        MoveToTarget();
 
     }
 

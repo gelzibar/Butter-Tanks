@@ -22,13 +22,14 @@ public class Player : MonoBehaviour
     }
     /* NOTE
         FixedTimestep in Time Settings and Default Contact offset in Physics were adjusted to smoothly move over tile edges.
+        Default Timestep .02 seems to generate edge catches regularly
+        No instances noticed at Timestep: 0.01 - 0.018.
+        Geometry Edge Catches noticed: 0.019 - .020.
      */
     // Game Objects
     private Rigidbody myRigidbody;
     // Physics and Movement
-    // W/S Inputs
     float forwardInput;
-    // A/D Inputs
     float steeringInput;
 
     // Acceleration
@@ -37,53 +38,23 @@ public class Player : MonoBehaviour
     Vector3 inAirMultiplier;
 
     // Torque (Angular) Acceleration
-    public float pivotMultiplier;
-
     public Vector3 pivotProduct;
 
     float curMaxVelocity, trueMaxVelocity;
-    public Vector3 counterVelocityTotal, counterVelocitySingle;
-    float terrainVelocityModifier;
     float squareMaxVelocity;
-    float initialMaxAngularVelocity;
+    public float initialMaxAngularVelocity;
 
     // Tilt Recovery
     TiltBoundary tiltBoundary;
-    bool isTiltRecovering;
-    int TiltRecoverySequence;
-    int sequence2Counter;
-    float initialDegreeX;
-    float initialDegreeZ;
-    float initialAngularDrag;
+    Stabilizer stabilizer;
 
-    // Jumping
     bool isJumping;
-
-    // Braking
     bool isBraking;
 
     // Initial Values
     public InitialConfiguration initial;
 
-    // Sound
-    new AudioSource audio;
-    public AudioClip sliding;
-    public AudioClip jumping;
-    public AudioClip wobble;
     bool jumpTrigger = false;
-
-    [System.Serializable]
-    public struct velocityTracker
-    {
-        public Vector3 curVelocity;
-
-        public void Update(Vector3 rbVelocity)
-        {
-            curVelocity = rbVelocity;
-        }
-    }
-
-    public velocityTracker myVelocity;
 
 
     void Start()
@@ -104,7 +75,7 @@ public class Player : MonoBehaviour
     {
         // Make sure game continues running when not in focus (this belongs somewhere else)
         Application.runInBackground = true;
-        
+
         // Game Objects
         myRigidbody = GetComponent<Rigidbody>();
 
@@ -113,12 +84,10 @@ public class Player : MonoBehaviour
         // Lowering the center of Mass helps with the stability of the cube. Raising it makes it prone to flip.
         myRigidbody.centerOfMass = new Vector3(myRigidbody.centerOfMass.x, myRigidbody.centerOfMass.y - .15f, myRigidbody.centerOfMass.z);
         myRigidbody.centerOfMass = new Vector3(myRigidbody.centerOfMass.x, myRigidbody.centerOfMass.y - .15f, myRigidbody.centerOfMass.z - .15f);
-        //original COM
-        // myRigidbody.centerOfMass = new Vector3(myRigidbody.centerOfMass.x, myRigidbody.centerOfMass.y - .5f, myRigidbody.centerOfMass.z);
 
         // Movement Values
-        forwardInput = 0.0f;
-        steeringInput = 0.0f;
+        forwardInput = 0;
+        steeringInput = 0;
 
         // acceleration Multiplier is public and declared from editor
         // pivot Multiplier is public and declared from editor
@@ -131,53 +100,47 @@ public class Player : MonoBehaviour
 
         trueMaxVelocity = 35.0f;
         curMaxVelocity = trueMaxVelocity;
-        counterVelocityTotal = new Vector3();
-        counterVelocitySingle = new Vector3();
-        terrainVelocityModifier = 1.0f;
         squareMaxVelocity = curMaxVelocity * curMaxVelocity;
+
         // Had been set to 3.0f
         initialMaxAngularVelocity = 10.0f;
         myRigidbody.maxAngularVelocity = initialMaxAngularVelocity;
 
         // Tilt Recovery
         tiltBoundary = transform.Find("Tilt Boundary").GetComponent<TiltBoundary>();
-        isTiltRecovering = false;
-        TiltRecoverySequence = 0;
-        initialDegreeX = 0;
-        initialDegreeZ = 0;
-        initialAngularDrag = myRigidbody.angularDrag;
-
 
         isJumping = false;
         isBraking = false;
 
-        audio = GetComponent<AudioSource>();
+        stabilizer = new Stabilizer();
+        stabilizer.Initialize(this);
 
     }
     void onFixedUpdate()
     {
-        if (BoxCaseGroundCheck())
+        bool groundCheck = Player.BoxCaseGroundCheck(myRigidbody, transform.up * -1);
+        if (groundCheck)
         {
             Move();
         }
-        else if (!BoxCaseGroundCheck() && tiltBoundary.currentCollides == 0)
+        else if (!groundCheck && tiltBoundary.NoCollisions())
         {
 
-            if (!isTiltRecovering)
+            if (!stabilizer.isTiltRecovering)
             {
-                InAirStability();
+                //stabilizer.InAirStability();
             }
             Move2();
         }
 
-        if (isTiltRecovering)
+        if (stabilizer.isTiltRecovering)
         {
-            TiltRecovery();
+            stabilizer.TiltRecovery();
         }
     }
     void onUpdate()
     {
-        curMaxVelocity = trueMaxVelocity * terrainVelocityModifier;
+        curMaxVelocity = trueMaxVelocity;
         squareMaxVelocity = curMaxVelocity * curMaxVelocity;
 
         if (Input.GetKeyDown(KeyCode.Escape))
@@ -187,9 +150,9 @@ public class Player : MonoBehaviour
 
         if (Input.GetKeyDown(KeyCode.F1))
         {
-            if (!BoxCaseGroundCheck() && tiltBoundary.currentCollides > 0)
+            if (!Player.BoxCaseGroundCheck(myRigidbody, transform.up * -1) && !tiltBoundary.NoCollisions())
             {
-                isTiltRecovering = true;
+                stabilizer.isTiltRecovering = true;
             }
 
         }
@@ -222,222 +185,7 @@ public class Player : MonoBehaviour
         {
             isBraking = false;
         }
-
-        myVelocity.Update(myRigidbody.velocity);
-
-        BasicSound();
     }
-
-    void BasicSound()
-    {
-        if (Mathf.Abs(myRigidbody.velocity.z) > 0.01f && BoxCaseGroundCheck())
-        {
-            audio.clip = sliding;
-            if (!audio.isPlaying)
-            {
-                audio.loop = true;
-                audio.Play();
-            }
-        }
-        else if (!BoxCaseGroundCheck() && tiltBoundary.currentCollides == 0)
-        {
-            audio.clip = wobble;
-            if (!audio.isPlaying)
-            { 
-                audio.loop = true;
-                audio.Play();
-            }
-
-        }
-        else
-        {
-            audio.Stop();
-        }
-
-        if (isJumping)
-        {
-            if (!jumpTrigger)
-            {
-                AudioSource.PlayClipAtPoint(jumping, transform.position);
-                jumpTrigger = true;
-            }
-        }
-        else
-        {
-            jumpTrigger = false;
-        }
-    }
-
-    void TiltRecovery()
-    {
-        if (TiltRecoverySequence == 0)
-        {
-            myRigidbody.AddForce(Vector3.up * 8f, ForceMode.Impulse);
-
-            myRigidbody.maxAngularVelocity = 2.0f;
-            TiltRecoverySequence++;
-            sequence2Counter = 180;
-            initialDegreeX = myRigidbody.rotation.eulerAngles.x;
-            initialDegreeZ = myRigidbody.rotation.eulerAngles.z;
-        }
-        else if (TiltRecoverySequence == 1)
-        {
-            Vector3 curAngle = new Vector3(myRigidbody.rotation.eulerAngles.x, myRigidbody.rotation.eulerAngles.y, myRigidbody.rotation.eulerAngles.z);
-            float degreeCeiling = 352f;
-            float degreeFloor = 8f;
-
-            float force = .0001f;
-
-            // X section
-            int signedX = 1;
-            if (curAngle.x < 180)
-            {
-                signedX *= -1;
-            }
-
-            float torqueValue = ExponentialDecay(initialDegreeX, force, (90 - sequence2Counter));
-
-            if (curAngle.x >= degreeFloor && curAngle.x <= degreeCeiling)
-            {
-                myRigidbody.AddRelativeTorque((float)(signedX * torqueValue), 0f, 0f, ForceMode.Impulse);
-            }
-
-            // Z section
-            int signedZ = 1;
-            if (curAngle.z < 180)
-            {
-                signedZ *= -1;
-            }
-
-            torqueValue = ExponentialDecay(initialDegreeZ, force, (90 - sequence2Counter));
-
-            if (curAngle.z >= degreeFloor && curAngle.z <= degreeCeiling)
-            {
-                myRigidbody.AddRelativeTorque(0f, 0f, (float)(signedZ * torqueValue), ForceMode.Impulse);
-            }
-
-
-            // If the unit has righted on both X and Z axes, Increase the drag to kill excess angularVelocity
-            if ((curAngle.z <= degreeFloor || curAngle.z >= degreeCeiling) && (curAngle.x <= degreeFloor || curAngle.x >= degreeCeiling))
-            {
-                myRigidbody.angularDrag = 10.0f;
-            }
-
-            if (sequence2Counter <= 0 || BoxCaseGroundCheck())
-            {
-                myRigidbody.angularDrag = initialAngularDrag;
-                myRigidbody.maxAngularVelocity = initialMaxAngularVelocity;
-                TiltRecoverySequence = 0;
-                isTiltRecovering = false;
-
-            }
-
-            sequence2Counter--;
-        }
-    }
-
-    void InAirStability()
-    {
-
-        if (TiltRecoverySequence == 0)
-        {
-            // myRigidbody.AddForce(Vector3.up * 8f, ForceMode.Impulse);
-
-            myRigidbody.maxAngularVelocity = 2.0f;
-            TiltRecoverySequence++;
-            sequence2Counter = 180;
-            initialDegreeX = myRigidbody.rotation.eulerAngles.x;
-            initialDegreeZ = myRigidbody.rotation.eulerAngles.z;
-        }
-        else if (TiltRecoverySequence == 1)
-        {
-            Vector3 curAngle = new Vector3(myRigidbody.rotation.eulerAngles.x, myRigidbody.rotation.eulerAngles.y, myRigidbody.rotation.eulerAngles.z);
-            Vector3 localAngularVelocity = transform.InverseTransformVector(myRigidbody.angularVelocity);
-            float degreeCeiling = 355f;
-            float degreeFloor = 5f;
-
-            // X section
-            int signedX = 1;
-            if (curAngle.x < 180)
-            {
-                signedX *= -1;
-            }
-
-            float deltaTargetAngularVelocity = 0f;
-            float frictionValue = GetComponent<BoxCollider>().material.dynamicFriction;
-            float targetValue = .15f;
-            float targetedAngularVelocityX = targetValue * signedX;
-            deltaTargetAngularVelocity = targetedAngularVelocityX - localAngularVelocity.x;
-            // deltaTargetAngularVelocity += frictionValue * Math.Sign(steeringInput);
-
-            Vector3 adjustment = Vector3.right * deltaTargetAngularVelocity;
-
-            if (curAngle.x >= degreeFloor && curAngle.x <= degreeCeiling)
-            {
-                myRigidbody.AddRelativeTorque(adjustment.x, 0f, 0f, ForceMode.VelocityChange);
-            }
-
-            // Z section
-            int signedZ = 1;
-            if (curAngle.z < 180)
-            {
-                signedZ *= -1;
-            }
-
-            float targetedAngularVelocityZ = targetValue * signedZ;
-            deltaTargetAngularVelocity = targetedAngularVelocityZ - localAngularVelocity.z;
-
-            adjustment = Vector3.forward * deltaTargetAngularVelocity;
-
-            if (curAngle.z >= degreeFloor && curAngle.z <= degreeCeiling)
-            {
-                myRigidbody.AddRelativeTorque(0f, 0f, adjustment.z, ForceMode.VelocityChange);
-            }
-
-
-            // If the unit has righted on both X and Z axes, Increase the drag to kill excess angularVelocity
-            if ((curAngle.z <= degreeFloor || curAngle.z >= degreeCeiling) && (curAngle.x <= degreeFloor || curAngle.x >= degreeCeiling))
-            {
-                // myRigidbody.angularDrag = 10.0f;
-            }
-
-            if (sequence2Counter <= 0 || BoxCaseGroundCheck())
-            {
-                myRigidbody.angularDrag = initialAngularDrag;
-                myRigidbody.maxAngularVelocity = initialMaxAngularVelocity;
-                TiltRecoverySequence = 0;
-                //isTiltRecovering = false;
-
-            }
-
-            sequence2Counter--;
-        }
-    }
-
-    float ExponentialDecay(float initial, float decayRate, float exponent)
-    {
-        // y = a(1-r)^x
-        // initial amount (1-% change) ^ units of time.
-        // |
-        //  \__
-
-        float solution = initial * (float)Math.Pow((1 - decayRate), exponent);
-        return solution;
-
-    }
-
-    // void OnGUI()
-    // {
-    //     Vector3 forwardDirection = new Vector3();
-    //     forwardDirection = Vector3.right * forwardInput * forwardMultiplier;
-    //     GUIStyle style = new GUIStyle();
-    //     style.fontSize = 16;
-    //     style.normal.textColor = Color.red;
-    //     GUI.Label(new Rect(10, 10, 200, 100), "Input: " + steeringInput, style);
-    //     GUI.Label(new Rect(10, 23, 200, 100), "Velocity: " + transform.InverseTransformVector(myRigidbody.velocity), style);
-    //     GUI.Label(new Rect(10, 36, 200, 100), "Angular Velocity: " + transform.InverseTransformVector(myRigidbody.angularVelocity).ToString("00.00"), style);
-    //     GUI.Label(new Rect(10, 49, 200, 100), "Angular Drag: " + myRigidbody.angularDrag, style);
-    // }
 
     void Move()
     {
@@ -469,11 +217,11 @@ public class Player : MonoBehaviour
         // seems to achieve the behavior
         if (Math.Abs(localVelocityZ) >= 0.25f)
         {
-            deltaTargetAngularVelocity = Steering2(baseTarget);
+            deltaTargetAngularVelocity = SteeringWithAdjustment(baseTarget);
         }
         else
         {
-            deltaTargetAngularVelocity = Steering2(baseTarget * 2.25f);
+            deltaTargetAngularVelocity = SteeringWithAdjustment(baseTarget * 2.25f);
         }
 
         pivotProduct = Vector3.up * deltaTargetAngularVelocity;
@@ -484,30 +232,27 @@ public class Player : MonoBehaviour
             isJumping = false;
         }
 
-        if (BoxCaseGroundCheck())
+        myRigidbody.AddRelativeTorque(pivotProduct, ForceMode.VelocityChange);
+        myRigidbody.AddRelativeForce(Vector3.forward * forwardInput * forwardMultiplier * climbFactor, ForceMode.Force);
+        if (isBraking)
         {
-            myRigidbody.AddRelativeTorque(pivotProduct, ForceMode.VelocityChange);
-            myRigidbody.AddRelativeForce(Vector3.forward * forwardInput * forwardMultiplier * climbFactor, ForceMode.Force);
-            if (isBraking)
+            if (Mathf.Abs(localVelocityZ) > 10f)
             {
-                Debug.Log("Is Braking");
-                if (Mathf.Abs(localVelocityZ) > 10f)
-                {
-                    myRigidbody.AddRelativeForce(0, 0, localVelocityZ * -.0125f, ForceMode.VelocityChange);
-                }
-                else if (Mathf.Abs(localVelocityZ) > 2.5f)
-                {
-                    myRigidbody.AddRelativeForce(0, 0, localVelocityZ * -.05f, ForceMode.VelocityChange);
-                }
-                else if (Mathf.Abs(localVelocityZ) <= 2.5f)
-                {
-                    myRigidbody.AddRelativeForce(0, 0, localVelocityZ * -.85f, ForceMode.VelocityChange);
-                }
+                myRigidbody.AddRelativeForce(0, 0, localVelocityZ * -.0125f, ForceMode.VelocityChange);
             }
-
-            RegulateVelocity();
-            RegulateLateralVelocity();
+            else if (Mathf.Abs(localVelocityZ) > 2.5f)
+            {
+                myRigidbody.AddRelativeForce(0, 0, localVelocityZ * -.05f, ForceMode.VelocityChange);
+            }
+            else if (Mathf.Abs(localVelocityZ) <= 2.5f)
+            {
+                myRigidbody.AddRelativeForce(0, 0, localVelocityZ * -.85f, ForceMode.VelocityChange);
+            }
         }
+
+        RegulateVelocity();
+        RegulateLateralVelocity();
+
     }
 
     void Move2()
@@ -533,11 +278,11 @@ public class Player : MonoBehaviour
         // seems to achieve the behavior
         if (Math.Abs(localVelocityZ) >= 0.25f)
         {
-            deltaTargetAngularVelocity = Steering2(baseTarget);
+            deltaTargetAngularVelocity = SteeringWithAdjustment(baseTarget);
         }
         else
         {
-            deltaTargetAngularVelocity = Steering2(baseTarget * 2.25f);
+            deltaTargetAngularVelocity = SteeringWithAdjustment(baseTarget * 2.25f);
         }
 
         pivotProduct = Vector3.up * deltaTargetAngularVelocity;
@@ -567,7 +312,7 @@ public class Player : MonoBehaviour
         return deltaTargetAngularVelocity;
     }
 
-    float Steering2(float targetValue)
+    float SteeringWithAdjustment(float targetValue)
     {
         /*
          * For some reason, I'm still seeing a variance on left/right turns. It seems to be something
@@ -623,35 +368,14 @@ public class Player : MonoBehaviour
         }
     }
 
-    bool BoxCaseGroundCheck()
+    public static bool BoxCaseGroundCheck(Rigidbody rb, Vector3 localDown)
     {
         Vector3 boxHalfSize = new Vector3(0.45f, 0.45f, .95f);
         int layerMask = 1 << 8;
 
         layerMask = ~layerMask;
-        Vector3 boxStartPosition = new Vector3(myRigidbody.position.x, myRigidbody.position.y, myRigidbody.position.z);
-        bool boxResponse = Physics.BoxCast(boxStartPosition, boxHalfSize, transform.up * -1, myRigidbody.rotation, 0.15f, layerMask);
+        Vector3 boxStartPosition = new Vector3(rb.position.x, rb.position.y, rb.position.z);
+        bool boxResponse = Physics.BoxCast(boxStartPosition, boxHalfSize, localDown, rb.rotation, 0.15f, layerMask);
         return boxResponse;
-    }
-
-    void OnCollisionEnter(Collision col)
-    {
-        float modifier = 1.0f;
-        if (col.gameObject.tag == "Hot")
-        {
-            modifier = 1.4f;
-        }
-        else if (col.gameObject.tag == "Cold")
-        {
-            modifier = 0.6f;
-        }
-
-        terrainVelocityModifier = modifier;
-
-    }
-
-    public void AddHealth(int amount)
-    {
-        //Add Health here
     }
 }

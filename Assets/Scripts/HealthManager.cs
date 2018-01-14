@@ -77,6 +77,8 @@ public class HealthManager : MonoBehaviour
                 nodes[index].GetComponent<ParticleSystem>().Stop();
                 nodes[index].GetComponent<ParticleSystem>().Play();
                 curPickup = Instantiate(pickupTemplate, nodes[index].position, nodes[index].rotation);
+                curPickup.transform.parent = nodes[index].transform;
+                curPickup.name = pickupTemplate.name;
                 curPickup.GetComponent<Rigidbody>().AddRelativeForce(force, ForceMode.Impulse);
                 isCountingDown = false;
             }

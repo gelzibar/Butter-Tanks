@@ -51,7 +51,7 @@ public class Pickup : MonoBehaviour
 	void OnTriggerEnter(Collider col) {
         // I don't like health being added on the pickup.
 		if(col.gameObject.tag == "Player") {
-			col.gameObject.GetComponent<Player>().AddHealth(healAmount);
+			// col.gameObject.GetComponent<Player>().AddHealth(healAmount);
 			Destroy(gameObject);
 		}
 	}
