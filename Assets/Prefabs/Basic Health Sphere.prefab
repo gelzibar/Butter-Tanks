@@ -58,8 +58,10 @@ GameObject:
   - component: {fileID: 54211492916430902}
   - component: {fileID: 114739555774540664}
   - component: {fileID: 96137062974443420}
+  - component: {fileID: 114072444243126530}
+  - component: {fileID: 114512161801930116}
   m_Layer: 9
-  m_Name: Pickup Small Health
+  m_Name: Basic Health Sphere
   m_TagString: Item
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -275,7 +277,7 @@ Rigidbody:
   m_IsKinematic: 0
   m_Interpolate: 0
   m_Constraints: 0
-  m_CollisionDetection: 0
+  m_CollisionDetection: 2
 --- !u!96 &96137062974443420
 TrailRenderer:
   serializedVersion: 2
@@ -363,6 +365,38 @@ TrailRenderer:
     generateLightingData: 0
   m_MinVertexDistance: 0.1
   m_Autodestruct: 0
+--- !u!114 &114072444243126530
+MonoBehaviour:
+  m_ObjectHideFlags: 1
+  m_PrefabParentObject: {fileID: 0}
+  m_PrefabInternal: {fileID: 100100000}
+  m_GameObject: {fileID: 1792526296264592}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 372142912, guid: dc443db3e92b4983b9738c1131f555cb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  m_SceneId:
+    m_Value: 0
+  m_AssetId:
+    i0: 29
+    i1: 1
+    i2: 195
+    i3: 151
+    i4: 87
+    i5: 229
+    i6: 164
+    i7: 141
+    i8: 58
+    i9: 177
+    i10: 211
+    i11: 33
+    i12: 186
+    i13: 116
+    i14: 54
+    i15: 37
+  m_ServerOnly: 0
+  m_LocalPlayerAuthority: 0
 --- !u!114 &114080778070887424
 MonoBehaviour:
   m_ObjectHideFlags: 1
@@ -381,6 +415,27 @@ MonoBehaviour:
     layerMask:
       serializedVersion: 2
       m_Bits: 0
+--- !u!114 &114512161801930116
+MonoBehaviour:
+  m_ObjectHideFlags: 1
+  m_PrefabParentObject: {fileID: 0}
+  m_PrefabInternal: {fileID: 100100000}
+  m_GameObject: {fileID: 1792526296264592}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -1768714887, guid: dc443db3e92b4983b9738c1131f555cb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  m_TransformSyncMode: 3
+  m_SendInterval: 0.033333335
+  m_SyncRotationAxis: 7
+  m_RotationSyncCompression: 0
+  m_SyncSpin: 1
+  m_MovementTheshold: 0.001
+  m_VelocityThreshold: 0.0001
+  m_SnapThreshold: 5
+  m_InterpolateRotation: 1
+  m_InterpolateMovement: 1
 --- !u!114 &114739555774540664
 MonoBehaviour:
   m_ObjectHideFlags: 1

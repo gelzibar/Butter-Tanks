@@ -7,9 +7,14 @@ using UnityEngine.UI;
 public class CountdownDisplay : MonoBehaviour
 {
 
-    List<HealthManager> myHealthManagers;
-    HealthManager curHealthManager;
-    GameObject myPlayer;
+    ObjectiveManager myObjectiveManager;
+    SpawnHub mySpawnHub;
+    public GameObject myPlayer;
+
+    void Awake()
+    {
+        onAwake();
+    }
 
     void Start()
     {
@@ -25,63 +30,93 @@ public class CountdownDisplay : MonoBehaviour
     {
         onUpdate();
     }
+
+    void onAwake()
+    {
+    }
     void onStart()
     {
-        myHealthManagers = new List<HealthManager>();
-        HealthManager[] tempManager = new HealthManager[2];
-        tempManager = GameObject.FindObjectsOfType<HealthManager>();
-        foreach (HealthManager instance in tempManager)
-        {
-            myHealthManagers.Add(instance);
-        }
 
-        myPlayer = GameObject.FindObjectOfType<Player>().gameObject;
+    }
 
-        SelectClosestHealthManager();
+    void Initialize()
+    {
+        myObjectiveManager = GameObject.FindObjectOfType<ObjectiveManager>();
     }
     void onFixedUpdate()
     {
 
     }
 
-    void SelectClosestHealthManager()
+    void SelectClosestObjectiveManager()
     {
-        float dist1 = Vector3.Distance(myPlayer.transform.position, myHealthManagers[0].transform.position);
-        float dist2 = Vector3.Distance(myPlayer.transform.position, myHealthManagers[1].transform.position);
+        float shortestDistance = -1f;
+        float distance = 0f;
 
-        if (dist1 < dist2)
+        foreach (SpawnHub instance in myObjectiveManager.hubs)
         {
-            curHealthManager = myHealthManagers[0];
-        }
-        else
-        {
-                curHealthManager = myHealthManagers[1];
+            if (shortestDistance == -1f)
+            {
+                mySpawnHub = instance;
+                shortestDistance = Mathf.Abs(Vector3.Distance(myPlayer.transform.position, mySpawnHub.transform.position));
+            }
+            else
+            {
+                // distance1 = Mathf.Abs(Vector3.Distance(myPlayer.transform.position, curObjectiveManager.transform.position));
+                distance = Mathf.Abs(Vector3.Distance(myPlayer.transform.position, instance.transform.position));
+
+                if (distance < shortestDistance)
+                {
+                    mySpawnHub = instance;
+                    shortestDistance = distance;
+                }
+
+            }
         }
 
     }
     void onUpdate()
     {
-        SelectClosestHealthManager();
-
-        if (curHealthManager.GetIsCountingDown())
+        if(myObjectiveManager == null)
         {
-            float countdown = curHealthManager.GetCurCountdown();
-            // countdown = (float)Math.Round(countdown, 2);
-            string textCount = countdown.ToString("00");
+            Initialize();
+        }
 
-            float millisecTransition = 3f;
-            if (countdown < millisecTransition)
+        foreach (Player player in GameObject.FindObjectsOfType<Player>())
+        {
+            if (player.GetLocalPlayer())
             {
-                textCount = countdown.ToString("00.0");
+                myPlayer = player.gameObject;
             }
 
-            gameObject.GetComponent<Text>().text = textCount;
         }
-        else
+
+        if (myPlayer != null)
         {
-            gameObject.GetComponent<Text>().text = "--";
+
+            SelectClosestObjectiveManager();
+            if (mySpawnHub.GetIsCountingDown())
+            {
+                float countdown = mySpawnHub.GetCountdown();
+                // countdown = (float)Math.Round(countdown, 2);
+                string textCount = countdown.ToString("00");
+
+                float millisecTransition = 3f;
+                if (countdown < millisecTransition)
+                {
+                    textCount = countdown.ToString("00.0");
+                }
+
+                gameObject.GetComponent<Text>().text = textCount;
+            }
+            else
+            {
+                gameObject.GetComponent<Text>().text = "--";
+
+            }
 
         }
 
     }
+
 }

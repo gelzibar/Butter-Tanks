@@ -2,8 +2,9 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Networking;
 
-public class Player : MonoBehaviour
+public class Player : NetworkBehaviour
 {
     [System.Serializable]
     public struct InitialConfiguration
@@ -20,14 +21,67 @@ public class Player : MonoBehaviour
         }
 
     }
+
+    [System.Serializable]
+    public struct PrefabList
+    {
+        // Prefabs
+        public GameObject Camera;
+    }
+
+    [System.Serializable]
+    public struct HealthProperties
+    {
+        [HideInInspector]
+        Player myPlayer;
+        public float decayRate;
+        public float initialDecay;
+        public float maxHealth;
+        public float maxDecayCycle;
+        public float curDecayCycle;
+
+        public void Initialize(Player player)
+        {
+            myPlayer = player;
+            initialDecay = .05f;
+            decayRate = initialDecay;
+            maxHealth = 100f;
+            maxDecayCycle = 1f;
+            curDecayCycle = 0;
+        }
+
+        public void DecayHealth()
+        {
+            if (curDecayCycle >= maxDecayCycle)
+            {
+                myPlayer.curHealth -= (decayRate * maxHealth);
+                curDecayCycle = 0;
+            }
+            else
+            {
+                curDecayCycle += Time.deltaTime;
+            }
+
+        }
+
+    }
+
     /* NOTE
         FixedTimestep in Time Settings and Default Contact offset in Physics were adjusted to smoothly move over tile edges.
         Default Timestep .02 seems to generate edge catches regularly
         No instances noticed at Timestep: 0.01 - 0.018.
         Geometry Edge Catches noticed: 0.019 - .020.
      */
+
+    public PrefabList myPrefabs;
+    public HealthProperties myHealth;
+    [SyncVar]
+    public float curHealth;
+
     // Game Objects
     private Rigidbody myRigidbody;
+    private GameObject myCamera;
+
     // Physics and Movement
     float forwardInput;
     float steeringInput;
@@ -59,25 +113,68 @@ public class Player : MonoBehaviour
 
     void Start()
     {
+        myHealth.Initialize(this);
+        if (isServer)
+            curHealth = myHealth.maxHealth;
+
         onStart();
+    }
+
+    public override void OnStartClient()
+    {
+        // onStart();
+    }
+    public override void OnStartServer()
+    {
+        // if (!isServer)
+        //     return;
+
+        // onStart();
+
     }
 
     void FixedUpdate()
     {
-        onFixedUpdate();
+        if (isLocalPlayer)
+        {
+            onFixedUpdateAlt1();
+            onFixedUpdateAlt2();
+        }
     }
 
     void Update()
     {
-        onUpdate();
+        Vector3 pos1 = new Vector3(0, 1f, .7071066f);
+        Vector3 pos2 = new Vector3(1, 0, -.7071066f);
+        Vector3 mid = Vector3.Lerp(pos1, pos2, .5f);
+
+        Debug.Log(mid.x.ToString("0.0000") + " " + mid.y.ToString("0.0000") + " " + mid.z.ToString("0.0000"));
+        if (isServer)
+        {
+            myHealth.DecayHealth();
+            ClampHealth();
+        }
+
+        if (isLocalPlayer)
+        {
+            onUpdate();
+        }
     }
     void onStart()
     {
         // Make sure game continues running when not in focus (this belongs somewhere else)
         Application.runInBackground = true;
 
+        // Network Creates a Player named "Player (Clone)". Want it to ID as Player
+        name = "Player";
+
         // Game Objects
         myRigidbody = GetComponent<Rigidbody>();
+        if (isLocalPlayer)
+        {
+            GameObject.FindObjectOfType<Camera>().gameObject.SetActive(false);
+            myCamera = Instantiate(myPrefabs.Camera, Vector3.zero, Quaternion.identity);
+        }
 
         initial.Initialize();
 
@@ -128,7 +225,7 @@ public class Player : MonoBehaviour
 
             if (!stabilizer.isTiltRecovering)
             {
-                //stabilizer.InAirStability();
+                stabilizer.InAirStability();
             }
             Move2();
         }
@@ -138,6 +235,36 @@ public class Player : MonoBehaviour
             stabilizer.TiltRecovery();
         }
     }
+
+    void onFixedUpdateAlt1()
+    {
+        bool groundCheck = Player.BoxCaseGroundCheck(myRigidbody, transform.up * -1);
+        if (groundCheck)
+        {
+            Move();
+        }
+        else if (!groundCheck && tiltBoundary.NoCollisions())
+        {
+            Move2();
+        }
+    }
+
+    void onFixedUpdateAlt2()
+    {
+        bool groundCheck = Player.BoxCaseGroundCheck(myRigidbody, transform.up * -1);
+        if (!groundCheck && tiltBoundary.NoCollisions())
+        {
+            if (!stabilizer.isTiltRecovering)
+            {
+                stabilizer.InAirStability();
+            }
+        }
+        if (stabilizer.isTiltRecovering)
+        {
+            stabilizer.TiltRecovery();
+        }
+    }
+
     void onUpdate()
     {
         curMaxVelocity = trueMaxVelocity;
@@ -377,5 +504,82 @@ public class Player : MonoBehaviour
         Vector3 boxStartPosition = new Vector3(rb.position.x, rb.position.y, rb.position.z);
         bool boxResponse = Physics.BoxCast(boxStartPosition, boxHalfSize, localDown, rb.rotation, 0.15f, layerMask);
         return boxResponse;
+    }
+
+    public void StopDecay()
+    {
+        if(!isServer)
+            return;
+        myHealth.decayRate = 0;
+    }
+
+    public void ResumeDecay()
+    {
+        if(!isServer)
+            return;
+        myHealth.decayRate = myHealth.initialDecay;
+    }
+
+    public bool GetLocalPlayer()
+    {
+        bool localPlayer = false;
+        if (isLocalPlayer)
+            localPlayer = true;
+
+        return localPlayer;
+
+    }
+
+    [Command]
+    void CmdDestroyPickup(NetworkInstanceId targetID)
+    {
+        GameObject target = NetworkServer.FindLocalObject(targetID);
+        NetworkServer.Destroy(target);
+    }
+
+    [Command]
+    void CmdCollectItem(NetworkInstanceId myID, NetworkInstanceId targetID)
+    {
+        GameObject target = NetworkServer.FindLocalObject(targetID);
+        Player myPlayer = NetworkServer.FindLocalObject(myID).GetComponent<Player>();
+        int healValue = target.GetComponent<Pickup>().healAmount;
+
+        myPlayer.AddHealth(healValue);
+        NetworkServer.Destroy(target);
+    }
+
+    public void ClampHealth()
+    {
+        if(!isServer)
+            return;
+
+        curHealth = Mathf.Clamp(curHealth, 0, myHealth.maxHealth);
+    }
+
+    public float GetMaxHealth()
+    {
+        return myHealth.maxHealth;
+    }
+
+    void OnTriggerEnter(Collider col)
+    {
+
+        // if (isServer)
+        // {
+            // I don't like health being added on the pickup.
+            if (col.gameObject.tag == "Item")
+            {
+                // col.gameObject.GetComponent<Player>().AddHealth(healAmount);
+                CmdCollectItem(this.netId, col.GetComponent<Pickup>().netId);
+                // AddHealth(col.GetComponent<Pickup>().healAmount);
+                // CmdDestroyPickup();
+            }
+        // }
+    }
+
+    public void AddHealth(int healAmount)
+    {
+        curHealth += healAmount;
+        curHealth = Mathf.Clamp(curHealth, 0, myHealth.maxHealth);
     }
 }
