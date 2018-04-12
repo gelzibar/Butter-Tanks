@@ -32,7 +32,6 @@ public class HealthDisplay : MonoBehaviour
 		{
 			scaleY = myPlayer.curHealth / myPlayer.GetMaxHealth();
 			scaleY = Mathf.Clamp(scaleY, 0, 1f);
-			Debug.Log("Health: " + myPlayer.curHealth + " Max: " + myPlayer.myHealth.maxHealth + " Scale: " +scaleY);
 			myText.text = myPlayer.curHealth.ToString();
 		}
 

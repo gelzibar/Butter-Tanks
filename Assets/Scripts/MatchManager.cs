@@ -3,6 +3,13 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Networking;
 
+
+/// MatchManager class
+///
+/// The MatchManager class holds the different match segments, as well as the network aware
+/// curStatus. It's intended to be an overarching piece gluing the parts together. While the
+/// parts will be doing most of the work.
+
 public class MatchManager : NetworkBehaviour
 {
     [SyncVar]
@@ -19,17 +26,22 @@ public class MatchManager : NetworkBehaviour
     int connectedPlayers;
     [SyncVar]
     bool isCreatingPlayer;
+    [SyncVar]
+    bool isDeletingPlayer;
 
-    PrematchManager prematch;
-    PreroundManager preround;
+    PrematchSegment prematch;
+    PreroundSegment preround;
+    RoundSegment round;
+
+    GameObject idleCam;
 
     // PREGAME
     // No Player prefab created - DONE
     // Shows number of players connected - DONE
     // countdown to start - DONE
-    // Host may start countdown or immediately launch - IN PROGRESS
+    // Host may start countdown or immediately launch - DONE
     // - Buttons are in place - DONE
-    // - Add logic to launch the match
+    // - Add logic to launch the match - DONE
     // EXTRA: When all players are readied, shorten countdown
 
     // countdown should be configurable
@@ -46,15 +58,20 @@ public class MatchManager : NetworkBehaviour
 
         }
 
-        prematch = gameObject.AddComponent(typeof(PrematchManager)) as PrematchManager;
+        prematch = gameObject.AddComponent(typeof(PrematchSegment)) as PrematchSegment;
         prematch.Initialize(this);
 
-        preround = gameObject.AddComponent(typeof(PreroundManager)) as PreroundManager;
-        
+        preround = gameObject.AddComponent(typeof(PreroundSegment)) as PreroundSegment;
+        preround.Initialize(this);
+
+        round = gameObject.AddComponent(typeof(RoundSegment)) as RoundSegment;
+        round.Initialize(this);
+
+        idleCam = GameObject.FindObjectOfType<Camera>().gameObject;
 
     }
 
-    void InitializeMatch()
+    void InitializeRound()
     {
         maxCountdown = 60f * .5f;
         curCountdown = maxCountdown;
@@ -68,41 +85,111 @@ public class MatchManager : NetworkBehaviour
         }
     }
 
+    void TerminateRound()
+    {
+        isCreatingPlayer = false;
+        // Need to reactivatee menu camera
+        // Need to delete Follow Camera
+        // Need to delete Player Object
+        // Perhaps ClientScene.DestroyAllClientObjects?
+        // GameObject oldCam = GameObject.FindObjectOfType<Camera>().gameObject;
+        // oldCam.SetActive(false);
+        idleCam.SetActive(true);
+        // Destroy(oldCam);
+        foreach (NetworkConnection conn in NetworkServer.connections)
+        {
+            foreach (PlayerController control in conn.playerControllers)
+            {
+                if (control.gameObject != null)
+                {
+                    Player playerScript = control.gameObject.GetComponent<Player>();
+                    if (playerScript.IsCameraSet())
+                    {
+                        control.gameObject.GetComponent<Player>().DestroyCamera();
+                    }
+
+                    isDeletingPlayer = true;
+                }
+            }
+        }
+    }
+
     void Update()
     {
-        Debug.Log(curStatus.ToString());
         if (isServer)
         {
             connectedPlayers = NetworkServer.connections.Count;
-            if (curStatus == Status.Round)
+            switch (curStatus)
             {
-                DecreaseTime();
+                case Status.Prematch:
+                    prematch.Run();
+                    maxCountdown = prematch.GetMaxCountdown();
+                    curCountdown = prematch.GetCurCountdown();
 
-                if (curCountdown == 0)
-                {
-                    RpcPause();
-                }
-            }
-            else if (curStatus == Status.Prematch)
-            {
-                prematch.Run();
-                maxCountdown = prematch.GetMaxCountdown();
-                curCountdown = prematch.GetCurCountdown();
+                    if (curCountdown == 0)
+                    {
+                        curStatus = Status.Preround;
+                        //InitializeMatch();
 
-                if (curCountdown == 0)
-                {
-                    Debug.Log("Countdown complete");
+                    }
+                    break;
+                case Status.Preround:
+                    preround.SetIsCountingDown(true);
+                    preround.Run();
+                    maxCountdown = preround.GetMaxCountdown();
+                    curCountdown = preround.GetCurCountdown();
+
+                    if (curCountdown == 0)
+                    {
+                        curStatus = Status.Round;
+                        InitializeRound();
+
+                        preround.SetIsCountingDown(false);
+                    }
+                    break;
+                case Status.Round:
+                    round.SetIsCountingDown(true);
+                    round.Run();
+
+                    maxCountdown = round.GetMaxCountdown();
+                    curCountdown = round.GetCurCountdown();
+                    // DecreaseTime();
+
+                    if (curCountdown == 0)
+                    {
+                        //RpcPause();
+                        curStatus = Status.Postround;
+
+                        round.SetIsCountingDown(false);
+                    }
+                    break;
+                case Status.Postround:
+                    TerminateRound();
+                    preround.ResetTimers(5f);
+                    prematch.ResetTimers(5f);
+                    round.ResetTimers(5f);
                     curStatus = Status.Preround;
-                    //InitializeMatch();
-                    
-                }
-
+                    break;
+                case Status.Postmatch:
+                    break;
+                default:
+                    break;
             }
+
         }
 
-        if(isCreatingPlayer)
+        Debug.Log("Creating: " + isCreatingPlayer + " : Count: " + ClientScene.localPlayers.Count);
+
+        if (isCreatingPlayer && ClientScene.localPlayers.Count == 0)
         {
+            Debug.Log("Trying to Add Player");
             ClientScene.AddPlayer(0);
+        }
+
+        if(isDeletingPlayer)
+        {
+            // ClientScene.DestroyAllClientObjects();
+            isDeletingPlayer = false;
         }
     }
 
@@ -143,6 +230,12 @@ public class MatchManager : NetworkBehaviour
 
     public void StartCountdown()
     {
+        prematch.SetIsCountingDown(true);
+    }
+
+    public void Launch()
+    {
+        prematch.SetCurCountdown(0);
         prematch.SetIsCountingDown(true);
     }
 }

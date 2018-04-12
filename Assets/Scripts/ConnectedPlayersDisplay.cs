@@ -21,7 +21,6 @@ public class ConnectedPlayersDisplay : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
-        Debug.Log("Updating");
         // if (SceneInfo.sceneLoaded)
         // {
             if(mm == null)

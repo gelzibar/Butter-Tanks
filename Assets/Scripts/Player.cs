@@ -148,7 +148,6 @@ public class Player : NetworkBehaviour
         Vector3 pos2 = new Vector3(1, 0, -.7071066f);
         Vector3 mid = Vector3.Lerp(pos1, pos2, .5f);
 
-        Debug.Log(mid.x.ToString("0.0000") + " " + mid.y.ToString("0.0000") + " " + mid.z.ToString("0.0000"));
         if (isServer)
         {
             myHealth.DecayHealth();
@@ -211,6 +210,27 @@ public class Player : NetworkBehaviour
 
         stabilizer = new Stabilizer();
         stabilizer.Initialize(this);
+
+    }
+    public void DestroyCamera()
+    {
+        myCamera.SetActive(false);
+        Destroy(myCamera);
+    }
+
+    public bool IsCameraSet()
+    {
+        bool returnVal = false;
+        if(myCamera != null)
+        {
+            returnVal = true;
+        }
+
+        return returnVal;
+    } 
+
+    public void enableIdleCamera()
+    {
 
     }
     void onFixedUpdate()

@@ -32,24 +32,20 @@ public class UIStateManager : NetworkBehaviour
     {
         if (lastStatus != mm.GetStatus())
         {
-            Debug.Log("last Status conditional");
             if (mm.GetStatus() == Status.Prematch)
             {
                 if (!isServer)
                 {
-                    Debug.Log("Running host UI check");
                     //prematch_hostUI.GetComponent<CanvasGroup>().interactable = false;
                     prematch_hostUI.SetActive(false);
                 }
                 else
                 {
-                    Debug.Log("isServer!");
                     prematch_hostUI.SetActive(true);
                 }
             }
             else if (mm.GetStatus() == Status.Preround)
             {
-                Debug.Log("Preround UI started");
                 // Preround should be the same for everyone. No need for server host distinction
 
             }
@@ -81,8 +77,14 @@ public class UIStateManager : NetworkBehaviour
                 round.SetActive(false);
                 break;
             case Status.Round:
+                prematch.SetActive(false);
+                preround.SetActive(false);
+                round.SetActive(true);  
+                break;              
             case Status.Postround:
+                break;
             case Status.Postmatch:
+                break;
             default:
                 break;
         }
